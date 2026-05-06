@@ -153,14 +153,14 @@ class DownloadService : Service() {
                     }
 
                     // Download abgeschlossen
-                    stopForeground(STOP_FOREGROUND_DETACH)
+                    stopForeground(STOP_FOREGROUND_REMOVE)
                     callback?.onDownloadComplete(file)
                     stopSelf()
                 } else {
                     throw Exception("HTTP-Fehler ${connection.responseCode}: ${connection.responseMessage}")
                 }
             } catch (e: Exception) {
-                stopForeground(STOP_FOREGROUND_DETACH)
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 callback?.onDownloadError(e.message ?: "Unbekannter Fehler")
                 stopSelf()
             } finally {
