@@ -4,7 +4,6 @@ import android.app.*
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import java.io.File
@@ -180,27 +179,30 @@ class DownloadService : Service() {
     private fun updateProgress(progress: Int) {
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val notification = createNotification(progress)
-        notificationManager.notify(
-            NOTIFICATION_ID,
-            notification
-        ) // aktualisiert die Benachrichtigung
+
+        // WICHTIG: Im Foreground Service aktualisiert notify() die bestehende Benachrichtigung.
+        notificationManager.notify(NOTIFICATION_ID, notification)
+
         callback?.onProgressUpdate(progress) // informiert die Activity
     }
 
     /**
      * Erstellt eine Benachrichtigung mit dem angegebenen Fortschritt.
      * Diese Benachrichtigung wird als Foreground-Benachrichtigung verwendet.
-     *
-     * @param progress {Int} Der aktuelle Fortschritt in Prozent (0-100)
-     * @return {Notification} Die erstellte Notification-Instanz
      */
     private fun createNotification(progress: Int): Notification {
+        val title = if (progress >= 100) "Download abgeschlossen" else "Download läuft..."
+        val contentText =
+            if (progress >= 0) "Fortschritt: $progress%" else "Verbindung wird hergestellt..."
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Download läuft...")
-            .setContentText("Fortschritt: $progress%")
+            .setContentTitle(title)
+            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setProgress(100, progress, false)
-            .setOngoing(true) // verhindert, dass der Nutzer die Benachrichtigung verwirft
+            .setPriority(NotificationCompat.PRIORITY_LOW) // Wichtig für API < 26, bei Kanälen überschrieben
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setProgress(100, if (progress < 0) 0 else progress, progress < 0)
+            .setOngoing(progress < 100)
             .build()
     }
 

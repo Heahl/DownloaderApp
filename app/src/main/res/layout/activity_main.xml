@@ -4,8 +4,7 @@
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
-    android:layout_marginTop="36dp">
+    android:padding="16dp">
 
     <EditText
         android:id="@+id/et_url"
@@ -13,7 +12,8 @@
         android:layout_height="wrap_content"
         android:autofillHints=""
         android:hint="@string/download_url"
-        android:inputType="textUri" />
+        android:inputType="textUri"
+        android:layout_marginTop="90dp" />
 
     <Button
         android:id="@+id/btn_download"
