@@ -235,6 +235,9 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
             binding.progressBar.progress = 100
             binding.tvProgress.text = getString(R.string._100)
             Toast.makeText(this, "Download abgeschlossen", Toast.LENGTH_LONG).show()
+            // Füge die Datei zum Repository hinzu, damit sie im RecyclerView angezeigt wird
+            repository.addFile(file)
+            updateDownloadList()
             // Öffne die heruntergeladene Datei
             openFile(file)
             // setze den Download-status auf inaktiv
@@ -269,8 +272,12 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
             "${applicationContext.packageName}.fileprovider",
             file
         )
+        
+        // Bestimme den MIME-Typ basierend auf der Dateierweiterung
+        val mimeType = getMimeType(file.name) ?: "application/octet-stream"
+        
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, contentResolver.getType(uri))
+            setDataAndType(uri, mimeType)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         // prüft, ob eine App existiert, die den Intent verarbeiten kann
@@ -279,6 +286,35 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
         } else {
             Toast.makeText(this, "Keine App zum Öffnen der Datei gefunden", Toast.LENGTH_SHORT)
                 .show()
+        }
+    }
+
+    /**
+     * Bestimmt den MIME-Typ basierend auf der Dateierweiterung.
+     *
+     * @param fileName {String} Der Name der Datei
+     * @return {String?} Der MIME-Typ oder null wenn nicht erkennbar
+     */
+    private fun getMimeType(fileName: String): String? {
+        val extension = fileName.substringAfterLast('.', "").lowercase()
+        return when (extension) {
+            "pdf" -> "application/pdf"
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "gif" -> "image/gif"
+            "mp3" -> "audio/mpeg"
+            "mp4" -> "video/mp4"
+            "txt" -> "text/plain"
+            "html", "htm" -> "text/html"
+            "doc" -> "application/msword"
+            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            "xls" -> "application/vnd.ms-excel"
+            "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            "ppt" -> "application/vnd.ms-powerpoint"
+            "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            "zip" -> "application/zip"
+            "apk" -> "application/vnd.android.package-archive"
+            else -> null
         }
     }
 
