@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Downloader-C</string>
+    <string name="download_url">URL</string>
+    <string name="btn_download">Herunterladen</string>
+    <string name="_0">0%</string>
+    <string name="_100">100%</string>
+    <string name="l_dt">Lädt...</string>
+    <string name="ffnen">Öffnen</string>
+    <string name="l_schen">Löschen</string>
+    <string name="noch_keine_downloads">Noch keine Downloads...</string>
+</resources>
