@@ -45,7 +45,7 @@
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
                 android:textColor="?android:attr/textColorSecondary"
-                tools:text="2.4 MB • 12.05.2026 14:30" />
+                tools:text="2.4 MB - 12.05.2026 14:30" />
         </LinearLayout>
 
         <ImageButton
