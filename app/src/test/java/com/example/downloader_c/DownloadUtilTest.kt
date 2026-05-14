@@ -1,26 +1,19 @@
 package com.example.downloader_c
 
 import org.junit.Assert.assertEquals
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import com.example.downloader_c.utils.DownloadUtils
 import org.junit.runners.JUnit4
 
 @RunWith(JUnit4::class)
 class DownloadUtilTest {
 
-    private lateinit var downloadService: DownloadService
-
-    @Before
-    fun setUp() {
-        downloadService = DownloadService()
-    }
-
     // ==================== getFileNameFromUrl Tests ====================
 
     @Test
     fun `getFileNameFromUrl returns correct name for simple URL`() {
-        val result = downloadService.getFileNameFromUrl(
+        val result = DownloadUtils.getFileNameFromUrl(
             "https://example.com/files/report.pdf",
             contentDisposition = null
         )
@@ -30,7 +23,7 @@ class DownloadUtilTest {
     @Test
     fun `getFileNameFromUrl returns correct name from content disposition`() {
         val contentDisposition = "attachment; filename=\"image.jpg\""
-        val result = downloadService.getFileNameFromUrl(
+        val result = DownloadUtils.getFileNameFromUrl(
             "https://example.com/files/download",
             contentDisposition
         )
@@ -39,7 +32,7 @@ class DownloadUtilTest {
 
     @Test
     fun `getFileNameFromUrl returns fallback name for malformed URL`() {
-        val result = downloadService.getFileNameFromUrl(
+        val result = DownloadUtils.getFileNameFromUrl(
             "https://example.com/",
             null
         )
@@ -48,7 +41,7 @@ class DownloadUtilTest {
 
     @Test
     fun `getFileNameFromUrl strips query parameters`() {
-        val result = downloadService.getFileNameFromUrl(
+        val result = DownloadUtils.getFileNameFromUrl(
             "https://example.com/files/data.csv?v=2&token=abc",
             null
         )
@@ -57,7 +50,7 @@ class DownloadUtilTest {
 
     @Test
     fun `getFileNameFromUrl handles empty lastPathSegment`() {
-        val result = downloadService.getFileNameFromUrl(
+        val result = DownloadUtils.getFileNameFromUrl(
             "https://example.com/",
             null
         )
@@ -67,7 +60,7 @@ class DownloadUtilTest {
     @Test
     fun `getFileNameFromUrl prefers ContentDisposition over URL filename`() {
         val contentDisposition = "attachment; filename=\"header_name.pdf\""
-        val result = downloadService.getFileNameFromUrl(
+        val result = DownloadUtils.getFileNameFromUrl(
             "https://example.com/files/url_name.txt",
             contentDisposition
         )
@@ -76,7 +69,7 @@ class DownloadUtilTest {
 
     @Test
     fun `getFileNameFromUrl handles filename with special characters`() {
-        val result = downloadService.getFileNameFromUrl(
+        val result = DownloadUtils.getFileNameFromUrl(
             "https://example.com/files/my-report_v2.1-final.pdf",
             null
         )
@@ -86,7 +79,7 @@ class DownloadUtilTest {
     @Test
     fun `getFileNameFromUrl handles content disposition without filename param`() {
         val contentDisposition = "attachment"
-        val result = downloadService.getFileNameFromUrl(
+        val result = DownloadUtils.getFileNameFromUrl(
             "https://example.com/files/report.pdf",
             contentDisposition
         )
@@ -96,7 +89,7 @@ class DownloadUtilTest {
     // ==================== Progress-Berechnung Tests ====================
 
     /**
-     * Helper-Funktion, die die gleiche Logik wie in DownloadService.startDownload() abbildet.
+     * Helper-Funktion, die die gleiche Logik wie in DownloadUtils.startDownload() abbildet.
      * Wichtig: totalSize > 0 prüfen, um Division durch Null zu vermeiden!
      */
     private fun calculateProgress(downloadedSize: Long, totalSize: Long): Int {

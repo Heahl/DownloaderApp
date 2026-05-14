@@ -9,9 +9,9 @@ import android.os.IBinder
 import android.view.View
 import android.widget.Toast
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -23,10 +23,16 @@ import com.example.downloader_c.data.DownloadHistoryRepository
 import com.example.downloader_c.data.DownloadListAdapter
 import com.example.downloader_c.data.DownloadedFile
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import androidx.lifecycle.Observer
+import com.example.downloader_c.callback.DownloadCallback
+import com.example.downloader_c.service.DownloadService
+import com.example.downloader_c.utils.DownloadUtils
+import com.example.downloader_c.viewModel.MainViewModel
+import com.example.downloader_c.viewModel.MainViewModelFactory
 
 
 /**
- * Main Activity der Downloader-C-App
+ * Main Activity der DownloaderApp
  *
  * Diese Activity ist für die Benutzeroberfläche zuständig:
  * - Eingabe des URLs
@@ -40,25 +46,24 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
  * Die heruntergeladenen Dateien und deren Metadaten werden lokal gespeichert.
  */
 class MainActivity : AppCompatActivity(), DownloadCallback {
-    // ViewBinding für die UI-Elemente
+    // viewBinding for ui elements
     private lateinit var binding: ActivityMainBinding
 
-    // repository für die verwaltung der Download-historie
-    private lateinit var repository: DownloadHistoryRepository
+    // viewModel for managing ui state
+    private val viewModel: MainViewModel by viewModels {
+        MainViewModelFactory(DownloadHistoryRepository(applicationContext))
+    }
 
-    // adapter für die recyclerview zur anzeige der Download-historie
+    // adapter for the recyclerview to display download-history
     private lateinit var adapter: DownloadListAdapter
 
-    // Referenz auf den Service
+    // reference to the service
     private var downloadService: DownloadService? = null
 
-    // Flag zum Überwachen des Bindungsstatus
+    // flag to watch binding state
     private var isBound = false
 
-    // Flag zum Überwachen des Downloadstatus
-    private var isDownloadActive = false
-
-    // Launcher für die runtime permission request für benachrichtigungen
+    // launcher for the runtime permission request for notifications
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -88,7 +93,7 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
             downloadService = binder.getService()
             downloadService?.setCallback(this@MainActivity)
             isBound = true
-            updateUiState(isDownloadActive)
+            updateUiState(viewModel.isDownloadActive.value ?: false)
         }
 
         /**
@@ -96,7 +101,7 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
          */
         override fun onServiceDisconnected(arg0: ComponentName) {
             isBound = false
-            downloadService = null // setzt die Referenz auf null, wenn die Verbindung verloren geht
+            downloadService = null // sets reference to null, if connection is lost
         }
     }
 
@@ -106,28 +111,51 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // initialisiert ViewBinding. binding.root ist das Root-Element des Layouts.
+        // initialize viewBinding. binding.root is the root-element of the layout
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        // repository initialisieren
-        repository = DownloadHistoryRepository(this)
 
         // recyclerview setup
         setupRecyclerView()
 
-        // initiale liste laden
-        updateDownloadList()
+        // watch data in viewModel
+        observeViewModel()
 
-        // Setzt den OnClickListener für den btnDownload
+        // set onClickListener for btnDownload
         binding.btnDownload.setOnClickListener {
-            val url = binding.etUrl.text.toString().trim() // holt die URL
-            if (url.isNotEmpty()) { // url validierung
+            val url = binding.etUrl.text.toString().trim() // get URL
+            if (url.isNotEmpty()) { // url validation
                 checkNotificationPermissionAndStart(url)
             } else {
                 Toast.makeText(this, "Bitte URL eingeben", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    /**
+     * Registriert Observer für die LiveData-Objekte im ViewModel.
+     */
+    private fun observeViewModel() {
+        // watch file list
+        viewModel.downloadedFiles.observe(this, Observer { files ->
+            adapter.submitList(files)
+            updateListVisibility(files.isEmpty())
+        })
+
+        // watch download state
+        viewModel.isDownloadActive.observe(this, Observer { isActive ->
+            updateUiState(isActive)
+        })
+
+        // watch download progress
+        viewModel.progress.observe(this, Observer { progress ->
+            updateProgressUi(progress)
+        })
+    }
+
+    private fun updateListVisibility(isEmpty: Boolean) {
+        binding.tvEmptyList.visibility = if (isEmpty) View.VISIBLE else View.GONE
+        binding.recyclerDownloads.visibility = if (isEmpty) View.GONE else View.VISIBLE
     }
 
     /**
@@ -139,12 +167,12 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
         when {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
                     PackageManager.PERMISSION_GRANTED -> {
-                // Berechtigung erteilt -> starte den Service
+                // permission -> start service
                 startDownloadService(url)
             }
 
             else -> {
-                // Berechtigung nicht erteilt -> fordere sie an
+                // !permission -> ask for permission
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
@@ -155,19 +183,13 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
      * Konfiguriert den Adapter mit Click-Handlern für "Öffnen" und "Löschen".
      */
     private fun setupRecyclerView() {
-        // initialisiert den Adapter mit Lambda-Funktionen für Klick-Events
+        // initializes the adapter with lambda functions for click events
         adapter = DownloadListAdapter(
-            onOpenClick = { file -> openFile(File(file.filePath)) },    // öffnet die Datei
-            onDeleteClick = { file -> deleteFile(file) }            // löscht die Datei
+            onOpenClick = { file -> openFile(File(file.filePath)) },    // open file
+            onDeleteClick = { file -> deleteFile(file) }            // close file
         )
 
-        // aktualisiert die Sichtbarkeit des leeren Listen-Textes und des Recyclers
-        binding.tvEmptyList.visibility =
-            if (repository.getFiles().isEmpty()) View.VISIBLE else View.GONE
-        binding.recyclerDownloads.visibility =
-            if (repository.getFiles().isEmpty()) View.GONE else View.VISIBLE
-
-        // wendet den adapter, layoutManager und animator auf die recyclerview an
+        // apply adapter, layoutManager and animator to recyclerview
         binding.recyclerDownloads.apply {
             this.adapter = this@MainActivity.adapter
             layoutManager = LinearLayoutManager(this@MainActivity)
@@ -175,18 +197,6 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
         }
     }
 
-    /**
-     * Lädt die aktuelle Liste der heruntergeladenen Dateien aus dem Repository und aktualisiert die
-     * RecyclerView. Passt auch die Sichtbarkeit des leeren Listen-Textes an.
-     */
-    private fun updateDownloadList() {
-        val files = repository.getFiles()   // holt die Dateiliste vom repository
-        adapter.submitList(files)           // übergibt die Liste dem adapter
-
-        // Sichtbarkeit aktualisieren
-        binding.tvEmptyList.visibility = if (files.isEmpty()) View.VISIBLE else View.GONE
-        binding.recyclerDownloads.visibility = if (files.isEmpty()) View.GONE else View.VISIBLE
-    }
 
     /**
      * Zeigt einen Bestätigungsdialog an und löscht die Datei, wenn der Nutzer zustimmt.
@@ -196,18 +206,23 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
      */
     private fun deleteFile(downloadedFile: DownloadedFile) {
         MaterialAlertDialogBuilder(this)
-            .setTitle("Datei löschen?")
-            .setMessage("Möchtest du '${downloadedFile.fileName}' wirklich löschen?")
-            .setPositiveButton("Löschen") { _, _ ->
-                // versucht den eintrag aus dem repository zu löschen
-                if (repository.removeFile(downloadedFile.id)) {
-                    File(downloadedFile.filePath).delete()
-                    // aktualisiere die Listenansicht
-                    updateDownloadList()
-                    Toast.makeText(this, "Gelöscht", Toast.LENGTH_SHORT).show()
-                }
+            .setTitle(getString(R.string.delete_confirmation_title))
+            .setMessage(
+                getString(
+                    R.string.delete_confirmation_message,
+                    downloadedFile.fileName
+                )
+            )
+            .setPositiveButton(R.string.delete_btn) { _, _ ->
+                viewModel.deleteFile(downloadedFile)
+                Toast.makeText(
+                    this, R.string.file_deleted, Toast.LENGTH_SHORT
+                )
+                    .show()
             }
-            .setNegativeButton("Abbrechen", null) // Schließt den Dialog ohne aktion
+            .setNegativeButton(
+                R.string.cancel_btn, null
+            ) // closes dialog without action
             .show()
     }
 
@@ -218,24 +233,22 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
      * @param url {String} Der URL der herunterzuladenden Datei
      */
     private fun startDownloadService(url: String) {
-        // 1. Intent für StartService: Enthält URL
-        // Startet den Service und übergibt den URL als Parameter
+        // 1. intent fort startSarvice: contains url
+        // start service and hand over url as parameter
         val startIntent = Intent(this, DownloadService::class.java)
         startIntent.putExtra("url", url)
         startService(startIntent)
 
-        // 2. Intent für bindService: Separat erstellt, um Verwirrung zu vermeiden
-        // Dient nur der Herstellung der Binding und nicht der Datenübergabe
-        // URL ist bereits über startService bekannt
+        // 2. intent for bindService: created separately
+        // creates binding, does not hand over data
+        // url is already known through startService
         val bindIntent = Intent(this, DownloadService::class.java)
-        // bindIntent enthält KEINE Extras.
-        // Kommunikation (Fortschritt, Status) erfolg über das Callback-Interface nach der Bindung.
+        // bindIntent does NOT contain extras
+        // communication (progress, state) achieved via callback interface after binding
         bindService(bindIntent, connection, BIND_AUTO_CREATE)
 
-        // setze downloadstatus auf aktiv
-        isDownloadActive = true
-        // aktualisiere UI, um aktiven Download anzuzeigen
-        updateUiState(isDownloadActive)
+        // set download state to active in viewModel
+        viewModel.setDownloadActive(true)
     }
 
     /**
@@ -244,11 +257,12 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
      * @param isActive {Boolean} Gibt an, ob ein Download läuft oder nicht (true = Download läuft)
      */
     private fun updateUiState(isActive: Boolean) {
-        // deaktiviere/ aktiviere den Download-btn
+        // deactivate / activate the download-btn
         binding.btnDownload.isEnabled = !isActive
-        // text der btn ändern
-        binding.btnDownload.text = if (isActive) "Download läuft..." else "Download starten"
-        // et-url deaktivieren
+        // change text of the btn
+        binding.btnDownload.text =
+            if (isActive) getString(R.string.download_running) else getString(R.string.start_download)
+        // deactivate et-url
         binding.etUrl.isEnabled = !isActive
     }
 
@@ -257,15 +271,18 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
      * Wird nicht automatisch im UI-Thread ausgeführt.
      * UI-Code muss daher innerhalb von runOnUiThread ausgeführt werden.
      */
-    @SuppressLint("SetTextI18n")
     override fun onProgressUpdate(progress: Int) {
+        viewModel.updateProgress(progress)
+    }
+
+    private fun updateProgressUi(progress: Int) {
         runOnUiThread {
             if (progress >= 0) {
                 binding.progressBar.isIndeterminate = false
-                // Aktualisiere die ProgressBar mit dem neuen Fortschritt
+                // update progressbar with new progress
                 binding.progressBar.progress = progress
-                // Aktualisiere den Text, der den Fortschritt anzeigt
-                binding.tvProgress.text = "$progress%"
+                // update progress-text
+                binding.tvProgress.text = getString(R.string.progress_format, progress)
             } else {
                 binding.progressBar.isIndeterminate = true
                 binding.tvProgress.text = getString(R.string.l_dt)
@@ -279,19 +296,15 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
      */
     override fun onDownloadComplete(file: File) {
         runOnUiThread {
-            // setze den Fortschritt auf 100%
-            binding.progressBar.progress = 100
-            binding.tvProgress.text = getString(R.string._100)
+            // set progress to 100%
+            viewModel.updateProgress(100)
             Toast.makeText(this, "Download abgeschlossen", Toast.LENGTH_LONG).show()
-            // Füge die Datei zum Repository hinzu, damit sie im RecyclerView angezeigt wird
-            repository.addFile(file)
-            updateDownloadList()
-            // Öffne die heruntergeladene Datei
+            // add file to repository via viewModel
+            viewModel.addDownloadedFile(file)
+            // open downloaded file
             openFile(file)
-            // setze den Download-status auf inaktiv
-            isDownloadActive = false
-            // aktualisiere die ui, um den abgeschlossenen Download anzuzeigen
-            updateUiState(false)
+            // set download state to inactive
+            viewModel.setDownloadActive(false)
         }
     }
 
@@ -301,10 +314,8 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
     override fun onDownloadError(message: String) {
         runOnUiThread {
             Toast.makeText(this, "Fehler: $message", Toast.LENGTH_LONG).show()
-            // setze den download-status auf inaktiv
-            isDownloadActive = false
-            // aktualisiere die UI, um den Fehler anzuzeigen
-            updateUiState(false)
+            // set download state to inactive
+            viewModel.setDownloadActive(false)
         }
     }
 
@@ -321,48 +332,19 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
             file
         )
 
-        // Bestimme den MIME-Typ basierend auf der Dateierweiterung
-        val mimeType = getMimeType(file.name) ?: "application/octet-stream"
+        // define mime type based on file ending
+        val mimeType = DownloadUtils.getMimeType(file.name)
 
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, mimeType)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        // prüft, ob eine App existiert, die den Intent verarbeiten kann
+        // check if app exists that can process the intent
         if (intent.resolveActivity(packageManager) != null) {
             startActivity(intent)
         } else {
-            Toast.makeText(this, "Keine App zum Öffnen der Datei gefunden", Toast.LENGTH_SHORT)
+            Toast.makeText(this, getString(R.string.no_app_found), Toast.LENGTH_SHORT)
                 .show()
-        }
-    }
-
-    /**
-     * Bestimmt den MIME-Typ basierend auf der Dateierweiterung.
-     *
-     * @param fileName {String} Der Name der Datei
-     * @return {String?} Der MIME-Typ oder null wenn nicht erkennbar
-     */
-    private fun getMimeType(fileName: String): String? {
-        val extension = fileName.substringAfterLast('.', "").lowercase()
-        return when (extension) {
-            "pdf" -> "application/pdf"
-            "jpg", "jpeg" -> "image/jpeg"
-            "png" -> "image/png"
-            "gif" -> "image/gif"
-            "mp3" -> "audio/mpeg"
-            "mp4" -> "video/mp4"
-            "txt" -> "text/plain"
-            "html", "htm" -> "text/html"
-            "doc" -> "application/msword"
-            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            "xls" -> "application/vnd.ms-excel"
-            "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            "ppt" -> "application/vnd.ms-powerpoint"
-            "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            "zip" -> "application/zip"
-            "apk" -> "application/vnd.android.package-archive"
-            else -> null
         }
     }
 
@@ -373,9 +355,10 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
     override fun onDestroy() {
         super.onDestroy()
         if (isBound) {
+            // unbind before clearing callback to prevent race condition
             unbindService(connection)
             isBound = false
-            // entfernt den Callback im Service, da die Activity nicht mehr existiert
+            // remove callback in service to prevent memory leaks
             downloadService?.setCallback(null)
         }
     }

@@ -7,6 +7,8 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.downloader_c.callback.DownloadCallback
+import com.example.downloader_c.service.DownloadService
 import org.junit.After
 import org.junit.Before
 import org.junit.Test

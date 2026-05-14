@@ -1,11 +1,17 @@
-package com.example.downloader_c
+package com.example.downloader_c.service
 
-import android.app.*
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.example.downloader_c.R
+import com.example.downloader_c.callback.DownloadCallback
+import com.example.downloader_c.utils.DownloadUtils
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -24,18 +30,18 @@ import java.util.concurrent.Executors
  */
 class DownloadService : Service() {
 
-    // Binder-Objekt, das von der Activity verwendet wird, um auf diesen Service zuzugreifen
+    // binder object used by the activity, to access this service
     private val binder = LocalBinder()
 
-    // Callback-Referenz, die von der Activity gesetzt wird, um Updates zu erhalten
+    // callback reference set by the activity, to receive updates
     private var callback: DownloadCallback? = null
 
-    // Executor für die Durchführung des Download-Vorgangs in einem Hintergrundthread
+    // executor for executing the download in a background thread
     private val executor = Executors.newSingleThreadExecutor()
 
-    // Eindeutige IDs für Benachrichtigungen und Kanäle
-    private val NOTIFICATION_ID = 1
-    private val CHANNEL_ID = "download_channel"
+    // unique ids for notifications and channel
+    private val notificationId = 1
+    private val channelId = "download_channel"
 
     /**
      * Lokaler Binder, der den Activity Zugriff auf die Service-Instanz gewährt.
@@ -80,13 +86,13 @@ class DownloadService : Service() {
      */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val url = intent?.getStringExtra("url") ?: run {
-            // falls keine URL im Intent ist, stoppe den Service sauber
+            // no url in intent? -> stop gracefully
             stopSelf()
             return START_NOT_STICKY
         }
         // starte den Download
         startDownload(url)
-        // start_sticky, damit der Service bei einem Absturz neu gestartet wird
+        // start_sticky -> service gets restartet after crash
         return START_STICKY
     }
 
@@ -98,16 +104,16 @@ class DownloadService : Service() {
      * @param url {String} Der URL der herunterzuladenden Datei
      */
     private fun startDownload(url: String) {
-        // 1. Initiale Foreground-Benachrichtigung anzeigen
+        // 1. initialize displaying foreground notification
         val initialNotification = createNotification(0)
 
         startForeground(
-            NOTIFICATION_ID,
+            notificationId,
             initialNotification,
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         )
 
-        // 2. Download im Hintergrund ausführen
+        // 2. execute download in background
         executor.execute {
             var inputStream: InputStream? = null
             var outputStream: OutputStream? = null
@@ -124,7 +130,10 @@ class DownloadService : Service() {
                     inputStream = connection.inputStream
 
                     val fileName =
-                        getFileNameFromUrl(url, connection.getHeaderField("Content-Disposition"))
+                        DownloadUtils.getFileNameFromUrl(
+                            url,
+                            connection.getHeaderField("Content-Disposition")
+                        )
                     val file = File(getExternalFilesDir(null), fileName)
 
                     outputStream = FileOutputStream(file)
@@ -138,20 +147,20 @@ class DownloadService : Service() {
                         outputStream.write(buffer, 0, bytesRead)
                         downloadedSize += bytesRead
 
-                        // Progress nur bei bekannter Größe berechnen
+                        // only calc progress if size is known
                         val progress = if (totalSize > 0) {
                             ((downloadedSize * 100) / totalSize).toInt()
                         } else {
                             -1
                         }
 
-                        // Nur bei gültigem Progress updaten
+                        // only update if progressed
                         if (progress >= 0) {
                             updateProgress(progress)
                         }
                     }
 
-                    // Download abgeschlossen
+                    // download complete
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     callback?.onDownloadComplete(file)
                     stopSelf()
@@ -180,10 +189,10 @@ class DownloadService : Service() {
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val notification = createNotification(progress)
 
-        // WICHTIG: Im Foreground Service aktualisiert notify() die bestehende Benachrichtigung.
-        notificationManager.notify(NOTIFICATION_ID, notification)
+        // foreground service updates the existing notification with notify()
+        notificationManager.notify(notificationId, notification)
 
-        callback?.onProgressUpdate(progress) // informiert die Activity
+        callback?.onProgressUpdate(progress) // inform the activity
     }
 
     /**
@@ -195,11 +204,10 @@ class DownloadService : Service() {
         val contentText =
             if (progress >= 0) "Fortschritt: $progress%" else "Verbindung wird hergestellt..."
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        return NotificationCompat.Builder(this, channelId)
             .setContentTitle(title)
             .setContentText(contentText)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setPriority(NotificationCompat.PRIORITY_LOW) // Wichtig für API < 26, bei Kanälen überschrieben
+            .setSmallIcon(R.drawable.stat_sys_download)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setProgress(100, if (progress < 0) 0 else progress, progress < 0)
             .setOngoing(progress < 100)
@@ -211,53 +219,14 @@ class DownloadService : Service() {
      */
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
-            CHANNEL_ID,
+            channelId,
             "Download-Fortschritt",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
             description = "Zeigt den Fortschritt laufender Downloads an."
         }
         val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(channel) // registriert den Kanal
-    }
-
-    /**
-     * Extrahiert den Dateinamen aus dem URL oder dem Content-Disposition-Header.
-     * @param url {String} Die URL der Datei.
-     * @param contentDisposition {String?} Der Content-Disposition-Header-Wert (kann null sein).
-     * @return {String} Der extrahierte Dateiname oder ein Standardname.
-     */
-    internal fun getFileNameFromUrl(url: String, contentDisposition: String?): String {
-        // 1. Dateinamen aus dem Content-Disposition-Header extrahieren
-        contentDisposition?.let {
-            // Zuerst filename* (RFC 5987) versuchen
-            val filenameStarRegex = Regex("filename\\*\\s*=\\s*[^']+'[^']+'([^\";]+)")
-            val starMatch = filenameStarRegex.find(it)
-            starMatch?.groupValues?.get(1)?.let { name ->
-                return java.net.URLDecoder.decode(name, "UTF-8")
-            }
-
-            // Fallback: normales filename
-            val filenameRegex = Regex("filename\\s*=\\s*\"?([^\";]+)\"?")
-            val matchResult = filenameRegex.find(it)
-            matchResult?.groupValues?.get(1)?.let { extractedFilename ->
-                return extractedFilename.trim(' ', '"', '\'')
-            }
-        }
-
-        // 2. Den Dateinamen aus dem URL extrahieren
-        val lastSlashIndex = url.lastIndexOf('/')
-        if (lastSlashIndex > -1 && lastSlashIndex < url.length - 1) {
-            val potentialFilename = url.substring(lastSlashIndex + 1)
-            // Entferne Query-Parameter (z.B. ?v=123) aus dem Dateinamen
-            val cleanFilename = potentialFilename.split('?')[0]
-            if (cleanFilename.isNotEmpty()) {
-                return cleanFilename
-            }
-        }
-
-        // 3. Falls alles fehlschlägt: Gib einen Standardnamen zurück
-        return "downloaded_file"
+        manager.createNotificationChannel(channel) // registers the channel
     }
 
     /**
@@ -265,7 +234,7 @@ class DownloadService : Service() {
      */
     override fun onDestroy() {
         super.onDestroy()
-        // Den Executor sauber herunterfahren
+        // gracefully shutdown the executor
         executor.shutdownNow()
     }
 }

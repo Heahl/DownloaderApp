@@ -8,8 +8,10 @@ espressoCore = "3.7.0"
 appcompat = "1.7.1"
 material = "1.13.0"
 activity = "1.13.0"
+activityKtx = "1.13.0"
 constraintlayout = "2.2.1"
 lifecycleRuntimeKtx = "2.10.0"
+lifecycleViewmodelKtx = "2.10.0"
 junitExt = "1.7.0"
 mockWebServer = "5.3.2"
 recyclerview = "1.4.0"
@@ -23,8 +25,10 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "junitExt" }
 androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "junitExt" }
 squareup-okhttp3-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "mockWebServer" }

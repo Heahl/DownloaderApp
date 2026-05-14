@@ -18,13 +18,13 @@ import java.io.File
  * @param context Der Application Context, um auf das interne Speicherverzeichnis zugreifen zu können.
  */
 class DownloadHistoryRepository(private val context: Context) {
-    // konfigurierte json-instanz für die Serialisierung/deserialisierung
+    // configure json instance for serialization / deserialization
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
-    // die datei, in der die historie im internen Speicher der App gespeichert wird.
+    // the file that holds the download history in the internal storage
     private val historyFile = File(context.filesDir, "download_history.json")
 
-    // Liste im Speicher als Cache
+    // list on storage as cache
     private val _files = mutableListOf<DownloadedFile>()
 
     /**
@@ -58,7 +58,7 @@ class DownloadHistoryRepository(private val context: Context) {
             mimeType = context.contentResolver.getType(file.toUri())
         )
 
-        // neueste zuerst
+        // latest first
         _files.add(0, downloadedFile)
         saveToDisk()
     }
@@ -75,11 +75,11 @@ class DownloadHistoryRepository(private val context: Context) {
     fun removeFile(fileId: String): Boolean {
         val index = _files.indexOfFirst { it.id == fileId }
         if (index != -1) {
-            // lösche die physische Datei
+            // remove the physical file
             File(_files[index].filePath).delete()
-            // entferne den Eintrag aus der liste
+            // remove entry from list
             _files.removeAt(index)
-            // Speichere die aktualisierte Liste
+            // save updated list
             saveToDisk()
             return true
         }
@@ -96,10 +96,14 @@ class DownloadHistoryRepository(private val context: Context) {
     private fun loadFromDisk() {
         if (historyFile.exists()) {
             try {
+                // read raw history file content
                 val content = historyFile.readText()
                 if (content.isNotBlank()) {
+                    // deserialize json string to list DownloadedFile objects
                     val list = json.decodeFromString<List<DownloadedFile>>(content)
+                    // clear existing cach before loading new data
                     _files.clear()
+                    // add all deserialized items to memory cache
                     _files.addAll(list)
                 }
             } catch (e: Exception) {
@@ -116,7 +120,9 @@ class DownloadHistoryRepository(private val context: Context) {
      */
     private fun saveToDisk() {
         try {
+            // convert memory cach to json string
             val content = json.encodeToString(_files)
+            // write serialized data to disk file
             historyFile.writeText(content)
         } catch (e: Exception) {
             e.printStackTrace()

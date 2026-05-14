@@ -5,6 +5,8 @@ import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.ServiceTestRule
+import com.example.downloader_c.callback.DownloadCallback
+import com.example.downloader_c.service.DownloadService
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
@@ -23,17 +25,12 @@ class DownloadServiceIntegrationTest {
     @get:Rule
     val serviceRule = ServiceTestRule()
 
-    // ❌ GrantPermissionRule für FOREGROUND_SERVICE entfernen!
-    // Diese Permission ist install-time, nicht runtime-grantable
-
     private lateinit var mockServer: MockWebServer
 
     @Before
     fun setUp() {
         mockServer = MockWebServer().apply { start() }
 
-        // Optional: POST_NOTIFICATIONS für Android 13+ manuell granten (falls nötig)
-        // Aber meist nicht nötig für Test-Builds mit debug-Signatur
     }
 
     @After
@@ -54,7 +51,7 @@ class DownloadServiceIntegrationTest {
                 .addHeader("Content-Disposition", "attachment; filename=\"$testFileName\"")
         )
 
-        // ✅ MockWebServer hostName für Device-Konnektivität
+        //  MockWebServer hostName für Device-Konnektivität
         val downloadUrl = mockServer.url("/$testFileName").toString()
             .replace("localhost", mockServer.hostName)
 
@@ -79,14 +76,14 @@ class DownloadServiceIntegrationTest {
             }
         }
 
-        // ✅ 3. Binden ZUERST für Callback
+        //  3. Binden ZUERST für Callback
         val bindIntent =
             Intent(ApplicationProvider.getApplicationContext(), DownloadService::class.java)
         val binder = serviceRule.bindService(bindIntent) as DownloadService.LocalBinder
         val service = binder.getService()
         service.setCallback(testCallback)
 
-        // ✅ 4. DANN Service als Foreground Service starten (Download startet in onStartCommand)
+        //  4. DANN Service als Foreground Service starten (Download startet in onStartCommand)
         val startIntent =
             Intent(ApplicationProvider.getApplicationContext(), DownloadService::class.java)
                 .putExtra("url", downloadUrl)
@@ -137,14 +134,14 @@ class DownloadServiceIntegrationTest {
             }
         }
 
-        // ✅ Binden
+        //  Binden
         val bindIntent =
             Intent(ApplicationProvider.getApplicationContext(), DownloadService::class.java)
         val binder = serviceRule.bindService(bindIntent) as DownloadService.LocalBinder
         val service = binder.getService()
         service.setCallback(testCallback)
 
-        // ✅ Starten
+        //  Starten
         val startIntent =
             Intent(ApplicationProvider.getApplicationContext(), DownloadService::class.java)
                 .putExtra("url", downloadUrl)
@@ -194,14 +191,14 @@ class DownloadServiceIntegrationTest {
             }
         }
 
-        // ✅ Binden
+        //  Binden
         val bindIntent =
             Intent(ApplicationProvider.getApplicationContext(), DownloadService::class.java)
         val binder = serviceRule.bindService(bindIntent) as DownloadService.LocalBinder
         val service = binder.getService()
         service.setCallback(testCallback)
 
-        // ✅ Starten
+        //  Starten
         val startIntent =
             Intent(ApplicationProvider.getApplicationContext(), DownloadService::class.java)
                 .putExtra("url", downloadUrl)
