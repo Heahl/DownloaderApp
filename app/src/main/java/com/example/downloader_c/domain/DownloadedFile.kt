@@ -1,4 +1,4 @@
-package com.example.downloader_c.data
+package com.example.downloader_c.domain
 
 import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat

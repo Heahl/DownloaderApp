@@ -1,43 +1,25 @@
-package com.example.downloader_c.utils
+package com.example.downloader_c.data
 
+import android.webkit.MimeTypeMap
 import java.net.URLDecoder
 
 /**
  * Utility-Klasse für allgemeine Download-Aufgaben wie MIME-Typ-Bestimmung
  * und Dateinamens-Extraktion.
- *
- * Durch das Auslagern dieser Logik wird die MainActivity entlastet und
- * der Code wird besser testbar.
  */
 object DownloadUtils {
 
     /**
      * Bestimmt den MIME-Typ basierend auf der Dateierweiterung.
+     * Verwendet MimeTypeMap für System-Standard-Mapping.
      *
      * @param fileName Der Name der Datei
      * @return Der MIME-Typ oder "application/octet-stream" als Fallback
      */
     fun getMimeType(fileName: String): String {
         val extension = fileName.substringAfterLast('.', "").lowercase()
-        return when (extension) {
-            "pdf" -> "application/pdf"
-            "jpg", "jpeg" -> "image/jpeg"
-            "png" -> "image/png"
-            "gif" -> "image/gif"
-            "mp3" -> "audio/mpeg"
-            "mp4" -> "video/mp4"
-            "txt" -> "text/plain"
-            "html", "htm" -> "text/html"
-            "doc" -> "application/msword"
-            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            "xls" -> "application/vnd.ms-excel"
-            "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            "ppt" -> "application/vnd.ms-powerpoint"
-            "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            "zip" -> "application/zip"
-            "apk" -> "application/vnd.android.package-archive"
-            else -> "application/octet-stream"
-        }
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) 
+            ?: "application/octet-stream"
     }
 
     /**

@@ -1,49 +1,36 @@
-package com.example.downloader_c
+package com.example.downloader_c.presentation
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.IBinder
 import android.view.View
 import android.widget.Toast
-import android.Manifest
-import android.content.pm.PackageManager
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import com.example.downloader_c.databinding.ActivityMainBinding
-import java.io.File
+import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.DefaultItemAnimator
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.downloader_c.data.DownloadHistoryRepository
-import com.example.downloader_c.data.DownloadListAdapter
-import com.example.downloader_c.data.DownloadedFile
+import com.example.downloader_c.R
+import com.example.downloader_c.data.JsonDownloadHistoryRepository
+import com.example.downloader_c.data.DownloadService
+import com.example.downloader_c.data.DownloadUtils
+import com.example.downloader_c.databinding.ActivityMainBinding
+import com.example.downloader_c.domain.DownloadCallback
+import com.example.downloader_c.domain.DownloadedFile
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import androidx.lifecycle.Observer
-import com.example.downloader_c.callback.DownloadCallback
-import com.example.downloader_c.service.DownloadService
-import com.example.downloader_c.utils.DownloadUtils
-import com.example.downloader_c.viewModel.MainViewModel
-import com.example.downloader_c.viewModel.MainViewModelFactory
+import java.io.File
 
 
 /**
  * Main Activity der DownloaderApp
- *
- * Diese Activity ist für die Benutzeroberfläche zuständig:
- * - Eingabe des URLs
- * - Starten des Downloads durch DownloadService
- * - Anzeigen des Fortschritts
- * - Öffnen der heruntergeladenen Datei
- *
- * Sie bindet sich an den DownloadService, um Fortschritts-Updates zu erhalten.
- * Der Download selbst wird über einen Started Foreground Service durchgeführt, um auch dann
- * fortzufahren, wenn die Activity nicht im Vordergrund ist.
- * Die heruntergeladenen Dateien und deren Metadaten werden lokal gespeichert.
  */
 class MainActivity : AppCompatActivity(), DownloadCallback {
     // viewBinding for ui elements
@@ -51,7 +38,7 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
 
     // viewModel for managing ui state
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory(DownloadHistoryRepository(applicationContext))
+        MainViewModelFactory(JsonDownloadHistoryRepository(applicationContext))
     }
 
     // adapter for the recyclerview to display download-history
@@ -72,7 +59,7 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
             val url = binding.etUrl.text.toString().trim()
             if (url.isNotEmpty()) startDownloadService(url)
         } else {
-            Toast.makeText(this, "Benachrichtigungs-Berechtigung erforderlich", Toast.LENGTH_SHORT)
+            Toast.makeText(this, getString(R.string.permission_required), Toast.LENGTH_SHORT)
                 .show()
         }
     }
@@ -127,7 +114,12 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
             if (url.isNotEmpty()) { // url validation
                 checkNotificationPermissionAndStart(url)
             } else {
-                Toast.makeText(this, "Bitte URL eingeben", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    getString(R.string.type_url),
+                    Toast.LENGTH_SHORT
+                )
+                    .show()
             }
         }
     }
@@ -298,13 +290,24 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
         runOnUiThread {
             // set progress to 100%
             viewModel.updateProgress(100)
-            Toast.makeText(this, "Download abgeschlossen", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this, getString(
+                    R.string.download_completed
+                ),
+                Toast.LENGTH_LONG
+            ).show()
             // add file to repository via viewModel
             viewModel.addDownloadedFile(file)
             // open downloaded file
             openFile(file)
             // set download state to inactive
             viewModel.setDownloadActive(false)
+            // cleanup binding
+            if (isBound) {
+                unbindService(connection)
+                isBound = false
+                downloadService = null
+            }
         }
     }
 
@@ -313,14 +316,27 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
      */
     override fun onDownloadError(message: String) {
         runOnUiThread {
-            Toast.makeText(this, "Fehler: $message", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                getString(
+                    R.string.error_message,
+                    message
+                ), Toast.LENGTH_LONG
+            )
+                .show()
             // set download state to inactive
             viewModel.setDownloadActive(false)
+            // cleanup binding
+            if (isBound) {
+                unbindService(connection)
+                isBound = false
+                downloadService = null
+            }
         }
     }
 
     /**
-     * Öffnet die heruntergeladene Datei mit einer geeigneten externen App.
+     * Öffnen der heruntergeladenen Datei mit einer geeigneten externen App.
      * Verwendet FileProvider für sicheren Dateizugriff.
      *
      * @param file {File} Die heruntergeladene Datei
@@ -343,7 +359,11 @@ class MainActivity : AppCompatActivity(), DownloadCallback {
         if (intent.resolveActivity(packageManager) != null) {
             startActivity(intent)
         } else {
-            Toast.makeText(this, getString(R.string.no_app_found), Toast.LENGTH_SHORT)
+            Toast.makeText(
+                this,
+                getString(R.string.no_app_found),
+                Toast.LENGTH_SHORT
+            )
                 .show()
         }
     }

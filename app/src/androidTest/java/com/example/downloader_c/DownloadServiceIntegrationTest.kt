@@ -5,8 +5,8 @@ import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.ServiceTestRule
-import com.example.downloader_c.callback.DownloadCallback
-import com.example.downloader_c.service.DownloadService
+import com.example.downloader_c.domain.DownloadCallback
+import com.example.downloader_c.data.DownloadService
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After

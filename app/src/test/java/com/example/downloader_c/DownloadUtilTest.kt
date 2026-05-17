@@ -3,7 +3,7 @@ package com.example.downloader_c
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
-import com.example.downloader_c.utils.DownloadUtils
+import com.example.downloader_c.data.DownloadUtils
 import org.junit.runners.JUnit4
 
 @RunWith(JUnit4::class)

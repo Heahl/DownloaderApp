@@ -27,7 +27,7 @@
         android:usesCleartextTraffic="true">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".presentation.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -36,7 +36,7 @@
         </activity>
 
         <service
-            android:name=".service.DownloadService"
+            android:name=".data.DownloadService"
             android:foregroundServiceType="dataSync"
             android:exported="false" />
 

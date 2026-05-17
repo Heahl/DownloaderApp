@@ -15,6 +15,16 @@
     <string name="delete_btn">Löschen</string>
     <string name="cancel_btn">Abbrechen</string>
     <string name="file_deleted">Datei gelöscht</string>
+    <string name="type_url">URL eingeben…</string>
+    <string name="download_completed">Download abgeschlossen</string>
+    <string name="error_message">Fehler: \'%1$s\'</string>
+    <string name="permission_required">Benachrichtigungs-Berechtigung erforderlich</string>
+    <string name="download_finished">Download abgeschlossen</string>
+    <string name="download_progress">Fortschritt: \'%1$d\'</string>
+    <string name="connecting">Verbindung wird hergestellt…</string>
+    <string name="download_cancelled">Download wurde abgebrochen</string>
+    <string name="no_connection">Keine Internetverbindung</string>
+    <string name="download_security">Sicherheitsfehler beim Download</string>
     <string name="l_schen">Löschen</string>
     <string name="noch_keine_downloads">Noch keine Downloads…</string>
 </resources>

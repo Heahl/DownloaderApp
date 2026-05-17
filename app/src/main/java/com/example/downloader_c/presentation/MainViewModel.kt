@@ -1,50 +1,56 @@
-package com.example.downloader_c.viewModel
+package com.example.downloader_c.presentation
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import com.example.downloader_c.data.DownloadHistoryRepository
-import com.example.downloader_c.data.DownloadedFile
+import com.example.downloader_c.domain.DownloadRepository
+import com.example.downloader_c.domain.DownloadedFile
 import java.io.File
 
 /**
  * ViewModel für die MainActivity.
  *
- * Verwaltet den gesamten UI-Zustand der DownloadApp:
+ * Verwaltet den gesamten UI-Zustand der Download-Anwendung:
  * - Speichert die Liste heruntergeladener Dateien (überlebt Konfigurationsänderungen)
  * - Verfolgt aktiven Download-Status (für Fortschrittsanzeige)
- * - Handhabt Fortschrittsaktualisierungen (0-100%)
+ * - Handhabt Fortschrittsaktualisierungen (0 - 100%)
  * - Koordiniert Datenfluss zwischen Repository und UI-Komponenten
  *
  * @param repository Zentrales Repository für Download-Historie-Verwaltung
  */
-class MainViewModel(private val repository: DownloadHistoryRepository) : ViewModel() {
+class MainViewModel(private val repository: DownloadRepository) : ViewModel() {
 
-    // internal mutable state for downloaded files (backing property)
+    // internal mutable state for downloaded file
     private val _downloadedFiles = MutableLiveData<List<DownloadedFile>>()
 
-    // exposed immutable liveData for ui observers (prevents direct mutation)
+    /**
+     * Öffentliche, unveränderliche [LiveData] für UI Beobachter
+     */
     val downloadedFiles: LiveData<List<DownloadedFile>> = _downloadedFiles
 
     // internal state for download activity flag
     private val _isDownloadActive = MutableLiveData<Boolean>(false)
 
-    // public liveData indicating active download operations (triggers ui update)
+    /**
+     * Öffentliche [LiveData], um aktiven Download anzuzeigen
+     */
     val isDownloadActive: LiveData<Boolean> = _isDownloadActive
 
-    // livedata for current progress (0-100)
+    // internal progress state (0 - 100)
     private val _progress = MutableLiveData<Int>(0)
 
-    // public liveData for progress bar updates
+    /**
+     * Öffentliche [LiveData] für Updates der Progress Bar
+     */
     val progress: LiveData<Int> = _progress
 
     init {
-        // initialize with persisted download history on viewModel creation
+        // init with persisted download history
         refreshDownloadList()
     }
 
     /**
-     * Lädt die aktuelle Download-Historie aus dem Repository
+     * Lädt die aktuelle Download-Historie aus dem Repository.
      *
      * Setzt den Zustand von _downloadedFiles auf die neueste Liste aus dem Repository.
      * Wird automatisch nach Konfigurationsänderungen aufgerufen, um UI-Konsistenz zu gewährleisten.
@@ -57,8 +63,9 @@ class MainViewModel(private val repository: DownloadHistoryRepository) : ViewMod
     /**
      * Aktualisiert den Download-Aktivitätsstatus.
      *
+     * Wichtig: Muss nach Download-Ende immer explizit auf `false` gesetzt werden.
+     *
      * @param active `true` während aktivem Download, `false` bei Inaktivität
-     * **Wichtig**: Muss immer explizit auf false gesetzt werden nach Download-Ende
      */
     fun setDownloadActive(active: Boolean) {
         // simple state update
@@ -68,15 +75,15 @@ class MainViewModel(private val repository: DownloadHistoryRepository) : ViewMod
     /**
      * Aktualisiert den Download-Fortschritt.
      *
-     * @param progressValue Prozentwert (0-100), muss im gültigen Bereich sein
+     * @param progressValue Prozentwert (0 - 100), muss im gültigen Bereich sein.
      */
     fun updateProgress(progressValue: Int) {
-        // postValue() instead of setValue() to handle background thread calls
+        // posValue() for thread-safety
         _progress.postValue(progressValue)
     }
 
     /**
-     * Fügt eine neue Datei zum Repository hinzu und aktualisiert die Liste.
+     * Fügt eine neu heruntergeladene Datei zum System hinzu.
      *
      * ### Ablauf:
      * 1. Speichert Metadaten im Repository
@@ -86,33 +93,25 @@ class MainViewModel(private val repository: DownloadHistoryRepository) : ViewMod
      * @param file Die physische Datei, die persistiert werden soll
      */
     fun addDownloadedFile(file: File) {
-        // persist file metadata in repo
+        // persist file metadata in (path, timestamp, size) repo
         repository.addFile(file)
-        // trigger ui update with new list
+        // trigger ui update
         refreshDownloadList()
     }
 
     /**
-     * Löscht eine Datei aus dem Repository und dem Dateisystem.
+     * Löscht eine Datei vollständig aus dem System.
      *
-     * ### Ablauf:
-     * 1. Entfernt Metadaten aus dem Repository
-     * 2. Löscht physische Datei
-     * 3. Aktualisiert UI durch List-Refresh
+     * Ablauf:
+     * 1. Delegiert die Löschung an das Repository (Metadaten + physische Datei)
+     * 2. Aktualisiert UI durch List-Refresh, wenn Löschung erfolgreich war
      *
      * @param downloadedFile Das zu löschende Datei-Objekt aus der Historie
      */
     fun deleteFile(downloadedFile: DownloadedFile) {
-        try {
-            // only attempt deletion if repository entry was removed
-            if (repository.removeFile(downloadedFile.id)) {
-                // delete actual file from storage
-                File(downloadedFile.filePath).delete()
-                // refresh ui
-                refreshDownloadList()
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        // only refresh ui if repository successfully removed the file
+        if (repository.removeFile(downloadedFile.id)) {
+            refreshDownloadList()
         }
     }
 }

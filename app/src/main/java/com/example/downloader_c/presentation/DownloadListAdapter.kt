@@ -1,4 +1,4 @@
-package com.example.downloader_c.data
+package com.example.downloader_c.presentation
 
 import android.annotation.SuppressLint
 import android.view.LayoutInflater
@@ -7,6 +7,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.example.downloader_c.databinding.ItemDownloadBinding
+import com.example.downloader_c.domain.DownloadedFile
 
 /**
  * Ein [ListAdapter], der eine Liste von [DownloadedFile]s in einem RecyclerView anzeigt.
